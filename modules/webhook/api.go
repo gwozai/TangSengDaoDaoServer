@@ -104,7 +104,7 @@ func (w *Webhook) Route(r *wkhttp.WKHttp) {
 
 	r.POST("/v2/webhook", w.webhook)
 
-	r.POST("/v1/datasource", w.datasource)
+	// r.POST("/v1/datasource", w.datasource)
 
 	r.POST("/v1/webhook/message/notify", w.messageNotify) // 接受IM的消息通知,(TODO: 此接口需要与IM做安全认证)
 
