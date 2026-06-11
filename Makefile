@@ -1,16 +1,15 @@
+IMAGE ?= registry.cn-shanghai.aliyuncs.com/wukongim/tangsengdaodaoserver
+PLATFORMS ?= linux/amd64,linux/arm64
+
 build:
 	docker build -t tangsengdaodaoserver .
 push:
 	docker tag tangsengdaodaoserver registry.cn-shanghai.aliyuncs.com/wukongim/tangsengdaodaoserver:latest
 	docker push registry.cn-shanghai.aliyuncs.com/wukongim/wukongchatserver:latest
 deploy:
-	docker build -t tangsengdaodaoserver . --platform linux/amd64
-	docker tag tangsengdaodaoserver registry.cn-shanghai.aliyuncs.com/wukongim/tangsengdaodaoserver:latest
-	docker push registry.cn-shanghai.aliyuncs.com/wukongim/tangsengdaodaoserver:latest
+	docker buildx build --platform $(PLATFORMS) -t $(IMAGE):latest --push --provenance=false .
 deploy-v2:
-	docker build -t tangsengdaodaoserver . --platform linux/amd64
-	docker tag tangsengdaodaoserver registry.cn-shanghai.aliyuncs.com/wukongim/tangsengdaodaoserver:v2
-	docker push registry.cn-shanghai.aliyuncs.com/wukongim/tangsengdaodaoserver:v2
+	docker buildx build --platform $(PLATFORMS) -t $(IMAGE):v2 --push --provenance=false .
 
 run-dev:
 	docker-compose build;docker-compose up -d
