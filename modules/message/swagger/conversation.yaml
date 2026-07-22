@@ -12,6 +12,86 @@ schemes:
 basePath: "/v1"
 
 paths:
+  /coversations:
+    get:
+      tags:
+        - "conversation"
+      summary: "获取最近会话列表（旧接口）"
+      description: "获取最近会话列表。路由中的 coversations 为历史拼写，保留用于兼容旧客户端。"
+      operationId: "get legacy conversations"
+      deprecated: true
+      produces:
+        - "application/json"
+      responses:
+        200:
+          description: "返回"
+          schema:
+            type: object
+            properties:
+              conversations:
+                type: array
+                items:
+                  $ref: "#/definitions/legacyConversation"
+              groups:
+                type: array
+                items:
+                  $ref: "#/definitions/legacyConversationGroup"
+              users:
+                type: array
+                items:
+                  $ref: "#/definitions/legacyConversationUser"
+        400:
+          description: "错误"
+          schema:
+            $ref: "#/definitions/response"
+      security:
+        - token: []
+  /coversation/clearUnread:
+    put:
+      tags:
+        - "conversation"
+      summary: "清除最近会话未读数（旧接口）"
+      description: "清除最近会话未读数。路由中的 coversation 为历史拼写，保留用于兼容旧客户端。"
+      operationId: "clear legacy conversation unread"
+      deprecated: true
+      consumes:
+        - "application/json"
+      produces:
+        - "application/json"
+      parameters:
+        - in: "body"
+          name: "body"
+          description: "要清除未读数的会话"
+          required: true
+          schema:
+            type: object
+            properties:
+              channel_id:
+                type: string
+                description: "频道唯一ID"
+              channel_type:
+                type: integer
+                format: int32
+                description: "频道类型"
+              unread:
+                type: integer
+                format: int32
+                description: "要设置的未读数量，0 表示清空"
+              message_seq:
+                type: integer
+                format: int64
+                description: "消息序号，仅超级群使用"
+      responses:
+        200:
+          description: "返回"
+          schema:
+            $ref: "#/definitions/response"
+        400:
+          description: "错误"
+          schema:
+            $ref: "#/definitions/response"
+      security:
+        - token: []
   /conversation/sync:
     post:
       tags:
@@ -55,12 +135,14 @@ paths:
               conversations:
                 type: array
                 items:
+                  type: object
                   properties:
                     channel_id:
                       type: string
                       description: "频道唯一ID"
                     channel_type:
-                      type: string
+                      type: integer
+                      format: int32
                       description: "频道类型"
                     unread:
                       type: integer
@@ -73,31 +155,44 @@ paths:
                       description: "免打扰"
                     timestamp:
                       type: integer
+                      format: int64
                       description: "最后一次会话时间"
+                    last_msg_seq:
+                      type: integer
+                      format: int64
+                      description: "最后一条消息seq"
                     last_client_msg_no:
                       type: string
                       description: "最后一条客户端消息编号"
                     offset_msg_seq:
                       type: integer
+                      format: int64
                       description: "偏移位的消息seq"
                     version:
                       type: integer
+                      format: int64
                       description: "数据版本"
                     recents:
                       type: array
                       items:
                         $ref: "#/definitions/syncMessage"
-                        description: "最近N条消息"
-                    users:
-                      type: array
-                      items:
-                        $ref: "#/definitions/UserDetailResp"
-                        description: "用户详情"
-                    groups:
-                      type: array
-                      items:
-                        $ref: "#/definitions/group"
-                        description: "群"
+                    extra:
+                      $ref: "#/definitions/conversationExtra"
+              users:
+                type: array
+                description: "用户详情"
+                items:
+                  $ref: "#/definitions/UserDetailResp"
+              groups:
+                type: array
+                description: "群详情"
+                items:
+                  $ref: "#/definitions/group"
+              channel_status:
+                type: array
+                description: "频道通话状态"
+                items:
+                  $ref: "#/definitions/channelState"
         400:
           description: "错误"
           schema:
@@ -168,28 +263,7 @@ paths:
           schema:
             type: array
             items:
-              properties:
-                channel_id:
-                  type: string
-                  description: "频道唯一ID"
-                channel_type:
-                  type: integer
-                  description: "频道类型"
-                browse_to:
-                  type: integer
-                  description: "预览到的位置，与会话保持位置不同的是 预览到的位置是用户读到的最大的messageSeq。跟未读消息数量有关系"
-                keep_message_seq:
-                  type: integer
-                  description: "会话保持的位置"
-                keep_offset_y:
-                  type: integer
-                  description: "会话保持的位置的偏移量"
-                draft:
-                  type: string
-                  description: "草稿"
-                version:
-                  type: integer
-                  description: "版本号"
+              $ref: "#/definitions/conversationExtra"
         400:
           description: "错误"
           schema:
@@ -215,7 +289,8 @@ paths:
           required: true
         - in: "path"
           name: "channel_type"
-          type: string
+          type: integer
+          format: int32
           description: "频道类型"
           required: true
       responses:
@@ -248,12 +323,13 @@ paths:
           required: true
         - in: "path"
           name: "channel_type"
-          type: string
+          type: integer
+          format: int32
           description: "频道类型"
           required: true
         - in: "body"
           name: "body"
-          description: "同步离线最近会话回执"
+          description: "最近会话扩展数据"
           required: true
           schema:
             type: object
@@ -293,6 +369,124 @@ securityDefinitions:
     description: "用户token"
 
 definitions:
+  conversationExtra:
+    type: "object"
+    properties:
+      channel_id:
+        type: string
+        description: "频道唯一ID"
+      channel_type:
+        type: integer
+        format: int32
+        description: "频道类型"
+      browse_to:
+        type: integer
+        format: int64
+        description: "预览到的位置，与会话保持位置不同的是，预览位置是用户已读到的最大 message_seq"
+      keep_message_seq:
+        type: integer
+        format: int64
+        description: "会话保持位置的 message_seq"
+      keep_offset_y:
+        type: integer
+        format: int32
+        description: "会话保持位置的 Y 轴偏移量"
+      draft:
+        type: string
+        description: "草稿"
+      version:
+        type: integer
+        format: int64
+        description: "版本号"
+  channelState:
+    type: "object"
+    properties:
+      channel_id:
+        type: string
+        description: "频道唯一ID"
+      channel_type:
+        type: integer
+        format: int32
+        description: "频道类型"
+      calling:
+        type: integer
+        format: int32
+        description: "是否正在通话，1 表示正在通话"
+  legacyConversation:
+    type: "object"
+    properties:
+      channel_id:
+        type: string
+        description: "频道唯一ID"
+      channel_type:
+        type: integer
+        format: int32
+        description: "频道类型"
+      unread:
+        type: integer
+        format: int64
+        description: "未读数量"
+      timestamp:
+        type: integer
+        format: int64
+        description: "最后一次会话时间戳"
+      last_message:
+        $ref: "#/definitions/syncMessage"
+  legacyConversationGroup:
+    type: "object"
+    properties:
+      group_no:
+        type: string
+        description: "群编号"
+      name:
+        type: string
+        description: "群名称"
+      notice:
+        type: string
+        description: "群公告"
+      mute:
+        type: integer
+        description: "是否免打扰，1 表示是"
+      top:
+        type: integer
+        description: "是否置顶，1 表示是"
+      show_nick:
+        type: integer
+        description: "是否显示群内成员昵称，1 表示是"
+      save:
+        type: integer
+        description: "是否保存到通讯录，1 表示是"
+      forbidden:
+        type: integer
+        description: "是否全员禁言，1 表示是"
+      invite:
+        type: integer
+        description: "是否开启群聊邀请确认，1 表示是"
+  legacyConversationUser:
+    type: "object"
+    properties:
+      id:
+        type: integer
+        format: int64
+        description: "用户数据ID"
+      uid:
+        type: string
+        description: "用户UID"
+      name:
+        type: string
+        description: "用户名称"
+      avatar:
+        type: string
+        description: "头像地址"
+      mute:
+        type: integer
+        description: "是否免打扰，1 表示是"
+      top:
+        type: integer
+        description: "是否置顶，1 表示是"
+      online:
+        type: integer
+        description: "是否在线，1 表示是"
   group:
     type: "object"
     properties:
@@ -302,6 +496,9 @@ definitions:
       group_type:
         type: integer
         description: "群类型 0.普通群 1.超大群"
+      category:
+        type: string
+        description: "群分类"
       name:
         type: string
         description: "群名称"
@@ -373,9 +570,20 @@ definitions:
         description: "我在群内角色 0.普通成员 1.群主 2.管理员"
       forbidden_expir_time:
         type: integer
+        format: int64
         description: "我在此群的禁言过期时间"
+      allow_member_pinned_message:
+        type: integer
+        description: "是否允许群成员置顶消息 1.是"
+      created_at:
+        type: string
+        description: "创建时间"
+      updated_at:
+        type: string
+        description: "更新时间"
       version:
         type: integer
+        format: int64
         description: "群数据版本"
   UserDetailResp:
     type: "object"
@@ -443,6 +651,9 @@ definitions:
       be_blacklist:
         type: integer
         description: "是否被拉黑 1.是"
+      code:
+        type: string
+        description: "旧版加好友验证码字段，请使用 vercode"
       vercode:
         type: string
         description: "加好友所需vercode"
@@ -470,33 +681,141 @@ definitions:
       flame_second:
         type: integer
         description: "阅后即焚秒数"
+      join_group_invite_uid:
+        type: string
+        description: "加入群聊邀请人UID"
+      join_group_invite_name:
+        type: string
+        description: "加入群聊邀请人名称"
+      join_group_time:
+        type: string
+        description: "加入群聊时间"
+      group_member:
+        $ref: "#/definitions/groupMember"
+  groupMember:
+    type: "object"
+    properties:
+      uid:
+        type: string
+        description: "成员UID"
+      group_no:
+        type: string
+        description: "群编号"
+      name:
+        type: string
+        description: "群成员名称"
+      remark:
+        type: string
+        description: "成员备注"
+      role:
+        type: integer
+        description: "成员角色"
+      is_deleted:
+        type: integer
+        description: "是否删除"
+      status:
+        type: integer
+        description: "成员状态，0.正常 2.黑名单"
+      vercode:
+        type: string
+        description: "验证码"
+      invite_uid:
+        type: string
+        description: "邀请人UID"
+      robot:
+        type: integer
+        description: "是否为机器人"
+      forbidden_expir_time:
+        type: integer
+        format: int64
+        description: "禁言到期时间"
+      created_at:
+        type: string
+        description: "创建时间"
+      updated_at:
+        type: string
+        description: "更新时间"
   syncMessage:
     type: "object"
     properties:
+      header:
+        type: object
+        properties:
+          no_persist:
+            type: integer
+            description: "是否不持久化"
+          red_dot:
+            type: integer
+            description: "是否显示红点"
+          sync_once:
+            type: integer
+            description: "是否只同步或消费一次"
+      setting:
+        type: integer
+        description: "消息设置"
       message_id:
+        type: integer
+        format: int64
+        description: "数字类型消息ID"
+      message_idstr:
         type: string
-        description: "消息ID"
+        description: "字符串类型消息ID"
       message_seq:
         type: integer
+        format: int64
         description: "消息序号"
+      client_msg_no:
+        type: string
+        description: "客户端消息编号"
+      stream_no:
+        type: string
+        description: "流编号"
+      from_uid:
+        type: string
+        description: "消息发送者UID"
+      to_uid:
+        type: string
+        description: "消息接收者UID"
       channel_id:
         type: string
         description: "频道ID"
       channel_type:
         type: integer
         description: "频道类型"
-      client_msg_no:
-        type: string
-        description: "客户端消息编号"
-      from_uid:
-        type: string
-        description: "消息发送者uid"
+      expire:
+        type: integer
+        format: int64
+        description: "消息过期秒数"
       timestamp:
         type: integer
+        format: int32
         description: "消息时间"
+      payload:
+        type: object
+        description: "消息正文"
+      signal_payload:
+        type: string
+        description: "加密正文的 Base64 编码"
+      reply_count:
+        type: integer
+        description: "回复数量"
+      reply_count_seq:
+        type: string
+        description: "回复数量序列"
+      reply_seq:
+        type: string
+        description: "回复序列"
+      reactions:
+        type: array
+        items:
+          $ref: "#/definitions/messageReaction"
       voice_status:
         type: integer
         description: "语音消息是否已读 1.是"
+      streams:
+        type: array
+        items:
+          $ref: "#/definitions/streamItem"
       is_deleted:
         type: integer
         description: "是否已删除 1.是"
@@ -518,25 +837,21 @@ definitions:
       readed:
         type: integer
         description: "是否已读(针对自己) 1.是"
-      receipt:
-        type: integer
-        description: "消息是否开启回执 1.是"
-      setting:
-        type: integer
-        description: "消息设置"
-      payload:
-        type: object
-        description: "消息正文"
-      signal_payload:
-        type: string
-        description: "加密正文"
       message_extra:
-        type: object
         $ref: "#/definitions/messageExtra"
-      reactions:
-        type: array
-        items:
-          $ref: "#/definitions/messageReaction"
+  streamItem:
+    type: "object"
+    properties:
+      stream_seq:
+        type: integer
+        format: int64
+        description: "流序号"
+      client_msg_no:
+        type: string
+        description: "客户端消息唯一编号"
+      blob:
+        type: object
+        description: "流消息内容"
   messageExtra:
     type: "object"
     properties:
@@ -567,6 +882,9 @@ definitions:
       is_mutual_deleted:
         type: integer
         description: "是否双向删除 1.是"
+      is_pinned:
+        type: integer
+        description: "是否置顶 1.是"
       content_edit:
         type: object
         description: "编辑后的正文"
@@ -579,23 +897,15 @@ definitions:
   messageReaction:
     type: "object"
     properties:
-      message_id:
-        type: string
-        description: "消息ID"
       uid:
         type: string
         description: "操作用户uid"
       name:
         type: string
         description: "操作用户名"
-      channel_id:
-        type: string
-        description: "频道ID"
-      channel_type:
-        type: integer
-        description: "频道类型"
       seq:
         type: integer
+        format: int64
         description: "消息序号"
       emoji:
         type: string
